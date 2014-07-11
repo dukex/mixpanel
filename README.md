@@ -1,24 +1,21 @@
+
 mixpanel
 ========
 
 Mixpanel Go Client
 
-## Usage
 
-Import
+## Usage
 
 ``` go
 import "github.com/dukex/mixpanel"
 ```
 --
 
-Config
+[documentation on godoc](http://godoc.org/github.com/dukex/mixpanel)
 
-``` go
-mixpanelToken :=   "e3bc4100330c35722740fb8c6f5abddc"
-client := NewMixpanel(mixpanelToken)
-```
---
+
+## Examples
 
 Track
 
@@ -29,7 +26,7 @@ res, err := client.Track("13793", "Signed Up", map[string]interface{}{
 ```
 --
 
-Identify
+Identify and Update Operation
 
 ``` go
 people := client.Identify("13793")
@@ -43,3 +40,11 @@ res, err := people.Update("$set", map[string]interface{}{
   "Birthday": "1948-01-01",
   })
 ```
+
+## License
+
+Released under the [MIT License](http://opensource.org/licenses/MIT).
+
+## Author
+
+Duke X ([dukex](http://github.com/dukex))
