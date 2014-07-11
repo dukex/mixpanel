@@ -6,11 +6,13 @@ import (
 	"net/http"
 )
 
+// The Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel struct {
 	Token  string
 	ApiURL string
 }
 
+// People represents a consumer, and is used on People Analytics
 type People struct {
 	m  *Mixpanel
 	id string
@@ -21,6 +23,7 @@ type trackParams struct {
 	Properties map[string]interface{} `json:"properties"`
 }
 
+// Track create a events to current distinct id
 func (m *Mixpanel) Track(distinctId string, eventName string,
 	properties map[string]interface{}) (*http.Response, error) {
 	params := trackParams{Event: eventName}
@@ -36,16 +39,19 @@ func (m *Mixpanel) Track(distinctId string, eventName string,
 	return m.send("track", params)
 }
 
+// Identify call mixpanel 'engage' and returns People instance
 func (m *Mixpanel) Identify(id string) *People {
 	params := map[string]interface{}{"$token": m.Token, "$distinct_id": id}
 	m.send("engage", params)
 	return &People{m: m, id: id}
 }
 
+// Track create a events to current people
 func (p *People) Track(eventName string, properties map[string]interface{}) (*http.Response, error) {
 	return p.m.Track(p.id, eventName, properties)
 }
 
+// Create a Update Operation to current people, see https://mixpanel.com/help/reference/http
 func (p *People) Update(operation string, updateParams map[string]interface{}) (*http.Response, error) {
 	params := map[string]interface{}{
 		"$token":       p.m.Token,
@@ -69,6 +75,7 @@ func (m *Mixpanel) send(eventType string, params interface{}) (*http.Response, e
 	return http.Get(url)
 }
 
+// NewMixpanel returns the client instance
 func NewMixpanel(token string) *Mixpanel {
 	return &Mixpanel{
 		Token:  token,
