@@ -4,6 +4,7 @@ mixpanel
 
 Mixpanel Go Client
 
+## Donate to 1P8ccYhVt4ByLahuVXiCY6U185gmYA8Rqf
 
 ## Usage
 
