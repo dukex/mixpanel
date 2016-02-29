@@ -21,8 +21,8 @@ import "github.com/dukex/mixpanel"
 Track
 
 ``` go
-res, err := client.Track("13793", "Signed Up", map[string]interface{}{
-    "Referred By": "Friend",
+err := client.Track("13793", "Signed Up", map[string]interface{}{
+	"Referred By": "Friend",
 })
 ```
 --
@@ -32,14 +32,14 @@ Identify and Update Operation
 ``` go
 people := client.Identify("13793")
 
-res, err := people.Track(map[string]interface{}{
-  "Buy": "133"
+err := people.Track(map[string]interface{}{
+	"Buy": "133"
 })
 
-res, err := people.Update("$set", map[string]interface{}{
-  "Address":  "1313 Mockingbird Lane",
-  "Birthday": "1948-01-01",
-  })
+err := people.Update("$set", map[string]interface{}{
+	"Address":  "1313 Mockingbird Lane",
+	"Birthday": "1948-01-01",
+})
 ```
 
 ## License
