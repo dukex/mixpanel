@@ -18,6 +18,7 @@ var (
 func setup() {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
+		w.Write([]byte("1\n"))
 		LastRequest = r
 	}))
 
@@ -130,5 +131,23 @@ func TestPeopleTrack(t *testing.T) {
 	if !reflect.DeepEqual(path, want) {
 		t.Errorf("path returned %+v, want %+v",
 			path, want)
+	}
+}
+
+func TestError(t *testing.T) {
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("0\n"))
+		LastRequest = r
+	}))
+
+	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
+
+	if err := client.Track("1", "name", nil); err != ErrTrackFailed {
+		t.Error("Got bad error for track", err)
+	}
+
+	if err := client.Identify("1").Track("name", nil); err != ErrTrackFailed {
+		t.Error("Got bad error for track", err)
 	}
 }
