@@ -7,14 +7,33 @@ import (
 )
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
-type Mixpanel struct {
+type Mixpanel interface {
+	// Track create a events to current distinct id
+	Track(distinctId string, eventName string, properties map[string]interface{}) (*http.Response, error)
+
+	// Identify call mixpanel 'engage' and returns People instance
+	Identify(id string) People
+}
+
+// The Mixapanel struct store the mixpanel endpoint and the project token
+type mixpanel struct {
 	Token  string
 	ApiURL string
 }
 
 // People represents a consumer, and is used on People Analytics
-type People struct {
-	m  *Mixpanel
+type People interface {
+	// Track create a events to current people
+	Track(eventName string, properties map[string]interface{}) (*http.Response, error)
+
+	// Create a Update Operation to current people, see
+	// https://mixpanel.com/help/reference/http
+	Update(operation string, updateParams map[string]interface{}) (*http.Response, error)
+}
+
+// People represents a consumer, and is used on People Analytics
+type people struct {
+	m  *mixpanel
 	id string
 }
 
@@ -24,7 +43,7 @@ type trackParams struct {
 }
 
 // Track create a events to current distinct id
-func (m *Mixpanel) Track(distinctId string, eventName string,
+func (m *mixpanel) Track(distinctId string, eventName string,
 	properties map[string]interface{}) (*http.Response, error) {
 	params := trackParams{Event: eventName}
 
@@ -40,19 +59,20 @@ func (m *Mixpanel) Track(distinctId string, eventName string,
 }
 
 // Identify call mixpanel 'engage' and returns People instance
-func (m *Mixpanel) Identify(id string) *People {
+func (m *mixpanel) Identify(id string) People {
 	params := map[string]interface{}{"$token": m.Token, "$distinct_id": id}
 	m.send("engage", params)
-	return &People{m: m, id: id}
+	return &people{m: m, id: id}
 }
 
 // Track create a events to current people
-func (p *People) Track(eventName string, properties map[string]interface{}) (*http.Response, error) {
+func (p *people) Track(eventName string, properties map[string]interface{}) (*http.Response, error) {
 	return p.m.Track(p.id, eventName, properties)
 }
 
-// Create a Update Operation to current people, see https://mixpanel.com/help/reference/http
-func (p *People) Update(operation string, updateParams map[string]interface{}) (*http.Response, error) {
+// Create a Update Operation to current people, see
+// https://mixpanel.com/help/reference/http
+func (p *people) Update(operation string, updateParams map[string]interface{}) (*http.Response, error) {
 	params := map[string]interface{}{
 		"$token":       p.m.Token,
 		"$distinct_id": p.id,
@@ -61,13 +81,12 @@ func (p *People) Update(operation string, updateParams map[string]interface{}) (
 	return p.m.send("engage", params)
 }
 
-func (m *Mixpanel) to64(data string) string {
+func (m *mixpanel) to64(data string) string {
 	bytes := []byte(data)
 	return base64.StdEncoding.EncodeToString(bytes)
 }
 
-func (m *Mixpanel) send(eventType string, params interface{}) (*http.Response, error) {
-
+func (m *mixpanel) send(eventType string, params interface{}) (*http.Response, error) {
 	dataJSON, _ := json.Marshal(params)
 	data := string(dataJSON)
 
@@ -75,10 +94,15 @@ func (m *Mixpanel) send(eventType string, params interface{}) (*http.Response, e
 	return http.Get(url)
 }
 
-// NewMixpanel returns the client instance
-func NewMixpanel(token string) *Mixpanel {
-	return &Mixpanel{
+// New returns the client instance. If apiURL is blank, the default will be used
+// ("https://api.mixpanel.com").
+func New(token, apiURL string) Mixpanel {
+	if apiURL == "" {
+		apiURL = "https://api.mixpanel.com"
+	}
+
+	return &mixpanel{
 		Token:  token,
-		ApiURL: "https://api.mixpanel.com",
+		ApiURL: apiURL,
 	}
 }

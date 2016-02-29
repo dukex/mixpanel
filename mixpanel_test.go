@@ -11,7 +11,7 @@ import (
 
 var (
 	ts          *httptest.Server
-	client      *Mixpanel
+	client      Mixpanel
 	LastRequest *http.Request
 )
 
@@ -21,8 +21,7 @@ func setup() {
 		LastRequest = r
 	}))
 
-	client = NewMixpanel("e3bc4100330c35722740fb8c6f5abddc")
-	client.ApiURL = ts.URL
+	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
 }
 
 func teardown() {
