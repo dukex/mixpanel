@@ -24,6 +24,7 @@ type Mixpanel interface {
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type mixpanel struct {
+	Client *http.Client
 	Token  string
 	ApiURL string
 }
@@ -97,7 +98,7 @@ func (m *mixpanel) send(eventType string, params interface{}) error {
 	data := string(dataJSON)
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
-	if resp, err := http.Get(url); err != nil {
+	if resp, err := m.Client.Get(url); err != nil {
 		return fmt.Errorf("mixpanel: %s", err.Error())
 	} else {
 		defer resp.Body.Close()
@@ -116,11 +117,18 @@ func (m *mixpanel) send(eventType string, params interface{}) error {
 // New returns the client instance. If apiURL is blank, the default will be used
 // ("https://api.mixpanel.com").
 func New(token, apiURL string) Mixpanel {
+	return NewFromClient(http.DefaultClient, token, apiURL)
+}
+
+// Creates a client instance using the specified client instance. This is useful
+// when using a proxy.
+func NewFromClient(c *http.Client, token, apiURL string) Mixpanel {
 	if apiURL == "" {
 		apiURL = "https://api.mixpanel.com"
 	}
 
 	return &mixpanel{
+		Client: c,
 		Token:  token,
 		ApiURL: apiURL,
 	}
