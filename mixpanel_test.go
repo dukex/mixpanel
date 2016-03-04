@@ -41,8 +41,10 @@ func TestTrack(t *testing.T) {
 	setup()
 	defer teardown()
 
-	client.Track("13793", "Signed Up", map[string]interface{}{
-		"Referred By": "Friend",
+	client.Track("13793", "Signed Up", &Event{
+		Properties: map[string]interface{}{
+			"Referred By": "Friend",
+		},
 	})
 
 	want := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
@@ -61,36 +63,16 @@ func TestTrack(t *testing.T) {
 	}
 }
 
-func TestIdentify(t *testing.T) {
-	setup()
-	defer teardown()
-
-	client.Identify("13793")
-
-	want := "{\"$distinct_id\":\"13793\",\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
-
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/engage"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
-}
-
 func TestPeopleOperations(t *testing.T) {
 	setup()
 	defer teardown()
 
-	people := client.Identify("13793")
-	people.Update("$set", map[string]interface{}{
-		"Address":  "1313 Mockingbird Lane",
-		"Birthday": "1948-01-01",
+	client.Update("13793", &Update{
+		Operation: "$set",
+		Properties: map[string]interface{}{
+			"Address":  "1313 Mockingbird Lane",
+			"Birthday": "1948-01-01",
+		},
 	})
 
 	want := "{\"$distinct_id\":\"13793\",\"$set\":{\"Address\":\"1313 Mockingbird Lane\",\"Birthday\":\"1948-01-01\"},\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
@@ -113,9 +95,10 @@ func TestPeopleTrack(t *testing.T) {
 	setup()
 	defer teardown()
 
-	people := client.Identify("13793")
-	people.Track("Signed Up", map[string]interface{}{
-		"Referred By": "Friend",
+	client.Track("13793", "Signed Up", &Event{
+		Properties: map[string]interface{}{
+			"Referred By": "Friend",
+		},
 	})
 
 	want := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
@@ -143,11 +126,11 @@ func TestError(t *testing.T) {
 
 	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
 
-	if err := client.Track("1", "name", nil); err != ErrTrackFailed {
+	if err := client.Update("1", &Update{}); err != ErrTrackFailed {
 		t.Error("Got bad error for track", err)
 	}
 
-	if err := client.Identify("1").Track("name", nil); err != ErrTrackFailed {
+	if err := client.Track("1", "name", &Event{}); err != ErrTrackFailed {
 		t.Error("Got bad error for track", err)
 	}
 }

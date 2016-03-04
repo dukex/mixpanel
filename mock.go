@@ -3,6 +3,7 @@ package mixpanel
 import (
 	"errors"
 	"fmt"
+	"time"
 )
 
 // Mocked version of Mixpanel which can be used in unit tests.
@@ -26,29 +27,41 @@ func (m *Mock) String() string {
 }
 
 // Identifies a user. The user will be added to the People map.
-func (m *Mock) Identify(distinctId string) People {
-	if p, ok := m.People[distinctId]; ok {
-		return p
-	} else {
-		p := &MockPeople{
+func (m *Mock) people(distinctId string) *MockPeople {
+	p := m.People[distinctId]
+	if p == nil {
+		p = &MockPeople{
 			Properties: map[string]interface{}{},
 		}
 		m.People[distinctId] = p
-		return p
 	}
+
+	return p
 }
 
-func (m *Mock) Track(distinctId string, eventName string, properties map[string]interface{}) error {
-	return m.Identify(distinctId).Track(eventName, properties)
+func (m *Mock) Track(distinctId, eventName string, e *Event) error {
+	p := m.people(distinctId)
+	p.Events = append(p.Events, MockEvent{
+		Event: *e,
+		Name:  eventName,
+	})
+	return nil
 }
 
 type MockPeople struct {
 	Properties map[string]interface{}
+	Time       *time.Time
+	IP         string
 	Events     []MockEvent
 }
 
 func (mp *MockPeople) String() string {
-	str := ""
+	timeStr := ""
+	if mp.Time != nil {
+		timeStr = mp.Time.Format(time.RFC3339)
+	}
+
+	str := fmt.Sprintf("  ip: %s\n  time: %s\n", mp.IP, timeStr)
 	str += "  properties:\n"
 	for key, val := range mp.Properties {
 		str += fmt.Sprintf("    %s: %v\n", key, val)
@@ -56,6 +69,14 @@ func (mp *MockPeople) String() string {
 	str += "  events:\n"
 	for _, event := range mp.Events {
 		str += "    " + event.Name + ":\n"
+		str += fmt.Sprintf("      IP: %s\n", event.IP)
+		if event.Timestamp != nil {
+			str += fmt.Sprintf(
+				"      Timestamp: %s\n", event.Timestamp.Format(time.RFC3339),
+			)
+		} else {
+			str += "      Timestamp:\n"
+		}
 		for key, val := range event.Properties {
 			str += fmt.Sprintf("      %s: %v\n", key, val)
 		}
@@ -63,16 +84,20 @@ func (mp *MockPeople) String() string {
 	return str
 }
 
-func (mp *MockPeople) Track(eventName string, properties map[string]interface{}) error {
-	mp.Events = append(mp.Events, MockEvent{eventName, properties})
-	return nil
-}
+func (m *Mock) Update(distinctId string, u *Update) error {
+	p := m.people(distinctId)
 
-func (mp *MockPeople) Update(operation string, updateParams map[string]interface{}) error {
-	switch operation {
+	if u.IP != "" {
+		p.IP = u.IP
+	}
+	if u.Timestamp != nil && u.Timestamp != IgnoreTime {
+		p.Time = u.Timestamp
+	}
+
+	switch u.Operation {
 	case "$set":
-		for key, val := range updateParams {
-			mp.Properties[key] = val
+		for key, val := range u.Properties {
+			p.Properties[key] = val
 		}
 	default:
 		return errors.New("mixpanel.Mock only supports the $set operation")
@@ -82,6 +107,6 @@ func (mp *MockPeople) Update(operation string, updateParams map[string]interface
 }
 
 type MockEvent struct {
-	Name       string
-	Properties map[string]interface{}
+	Event
+	Name string
 }
