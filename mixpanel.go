@@ -3,82 +3,154 @@ package mixpanel
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"time"
+)
+
+var (
+	ErrTrackFailed = errors.New("Mixpanel did not return 1 when tracking")
+
+	IgnoreTime *time.Time = &time.Time{}
 )
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
-type Mixpanel struct {
+type Mixpanel interface {
+	// Create a mixpanel event
+	Track(distinctId, eventName string, e *Event) error
+
+	// Set properties for a mixpanel user.
+	Update(distinctId string, u *Update) error
+}
+
+// The Mixapanel struct store the mixpanel endpoint and the project token
+type mixpanel struct {
+	Client *http.Client
 	Token  string
 	ApiURL string
 }
 
-// People represents a consumer, and is used on People Analytics
-type People struct {
-	m  *Mixpanel
-	id string
+// A mixpanel event
+type Event struct {
+	// IP-address of the user. Leave empty to use autodetect, or set to "0" to
+	// not specify an ip-address.
+	IP string
+
+	// Timestamp. Set to nil to use the current time.
+	Timestamp *time.Time
+
+	// Custom properties. At least one must be specified.
+	Properties map[string]interface{}
 }
 
-type trackParams struct {
-	Event      string                 `json:"event"`
-	Properties map[string]interface{} `json:"properties"`
+// An update of a user in mixpanel
+type Update struct {
+	// IP-address of the user. Leave empty to use autodetect, or set to "0" to
+	// not specify an ip-address at all.
+	IP string
+
+	// Timestamp. Set to nil to use the current time, or IgnoreTime to not use a
+	// timestamp.
+	Timestamp *time.Time
+
+	// Update operation such as "$set", "$update" etc.
+	Operation string
+
+	// Custom properties. At least one must be specified.
+	Properties map[string]interface{}
 }
 
 // Track create a events to current distinct id
-func (m *Mixpanel) Track(distinctId string, eventName string,
-	properties map[string]interface{}) (*http.Response, error) {
-	params := trackParams{Event: eventName}
+func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
+	props := map[string]interface{}{
+		"token":       m.Token,
+		"distinct_id": distinctId,
+	}
+	if e.IP != "" {
+		props["ip"] = e.IP
+	}
+	if e.Timestamp != nil {
+		props["time"] = e.Timestamp.Unix()
+	}
 
-	params.Properties = make(map[string]interface{}, 0)
-	params.Properties["token"] = m.Token
-	params.Properties["distinct_id"] = distinctId
+	for key, value := range e.Properties {
+		props[key] = value
+	}
 
-	for key, value := range properties {
-		params.Properties[key] = value
+	params := map[string]interface{}{
+		"event":      eventName,
+		"properties": props,
 	}
 
 	return m.send("track", params)
 }
 
-// Identify call mixpanel 'engage' and returns People instance
-func (m *Mixpanel) Identify(id string) *People {
-	params := map[string]interface{}{"$token": m.Token, "$distinct_id": id}
-	m.send("engage", params)
-	return &People{m: m, id: id}
-}
-
-// Track create a events to current people
-func (p *People) Track(eventName string, properties map[string]interface{}) (*http.Response, error) {
-	return p.m.Track(p.id, eventName, properties)
-}
-
-// Create a Update Operation to current people, see https://mixpanel.com/help/reference/http
-func (p *People) Update(operation string, updateParams map[string]interface{}) (*http.Response, error) {
+// Updates a user in mixpanel. See
+// https://mixpanel.com/help/reference/http#people-analytics-updates
+func (m *mixpanel) Update(distinctId string, u *Update) error {
 	params := map[string]interface{}{
-		"$token":       p.m.Token,
-		"$distinct_id": p.id,
+		"$token":       m.Token,
+		"$distinct_id": distinctId,
 	}
-	params[operation] = updateParams
-	return p.m.send("engage", params)
+
+	if u.IP != "" {
+		params["$ip"] = u.IP
+	}
+	if u.Timestamp == IgnoreTime {
+		params["$ignore_time"] = true
+	} else if u.Timestamp != nil {
+		params["$time"] = u.Timestamp.Unix()
+	}
+
+	params[u.Operation] = u.Properties
+
+	return m.send("engage", params)
 }
 
-func (m *Mixpanel) to64(data string) string {
+func (m *mixpanel) to64(data string) string {
 	bytes := []byte(data)
 	return base64.StdEncoding.EncodeToString(bytes)
 }
 
-func (m *Mixpanel) send(eventType string, params interface{}) (*http.Response, error) {
-
+func (m *mixpanel) send(eventType string, params interface{}) error {
 	dataJSON, _ := json.Marshal(params)
 	data := string(dataJSON)
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
-	return http.Get(url)
+	if resp, err := m.Client.Get(url); err != nil {
+		return fmt.Errorf("mixpanel: %s", err.Error())
+	} else {
+		defer resp.Body.Close()
+		body, bodyErr := ioutil.ReadAll(resp.Body)
+		if bodyErr != nil {
+			return fmt.Errorf("mixpanel: %s", bodyErr.Error())
+		}
+		if string(body) != "1" && string(body) != "1\n" {
+			return ErrTrackFailed
+		}
+	}
+
+	return nil
 }
 
-// NewMixpanel returns the client instance
-func NewMixpanel(token string) *Mixpanel {
-	return &Mixpanel{
+// New returns the client instance. If apiURL is blank, the default will be used
+// ("https://api.mixpanel.com").
+func New(token, apiURL string) Mixpanel {
+	return NewFromClient(http.DefaultClient, token, apiURL)
+}
+
+// Creates a client instance using the specified client instance. This is useful
+// when using a proxy.
+func NewFromClient(c *http.Client, token, apiURL string) Mixpanel {
+	if apiURL == "" {
+		apiURL = "https://api.mixpanel.com"
+	}
+
+	return &mixpanel{
+		Client: c,
 		Token:  token,
-		ApiURL: "https://api.mixpanel.com",
+		ApiURL: apiURL,
 	}
 }
