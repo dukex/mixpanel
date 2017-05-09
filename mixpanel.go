@@ -23,6 +23,8 @@ type Mixpanel interface {
 
 	// Set properties for a mixpanel user.
 	Update(distinctId string, u *Update) error
+
+	Alias(distinctId, newId string) error
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
@@ -60,6 +62,22 @@ type Update struct {
 
 	// Custom properties. At least one must be specified.
 	Properties map[string]interface{}
+}
+
+// Track create a events to current distinct id
+func (m *mixpanel) Alias(distinctId, newId string) error {
+	props := map[string]interface{}{
+		"token":       m.Token,
+		"distinct_id": distinctId,
+		"alias":       newId,
+	}
+
+	params := map[string]interface{}{
+		"event":      "$create_alias",
+		"properties": props,
+	}
+
+	return m.send("track", params)
 }
 
 // Track create a events to current distinct id
