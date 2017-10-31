@@ -77,7 +77,7 @@ func (m *mixpanel) Alias(distinctId, newId string) error {
 		"properties": props,
 	}
 
-	return m.send("track", params)
+	return m.send("track", params, false)
 }
 
 // Track create a events to current distinct id
@@ -102,7 +102,9 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 		"properties": props,
 	}
 
-	return m.send("track", params)
+	autoGeolocate := e.IP == ""
+
+	return m.send("track", params, autoGeolocate)
 }
 
 // Updates a user in mixpanel. See
@@ -124,7 +126,9 @@ func (m *mixpanel) Update(distinctId string, u *Update) error {
 
 	params[u.Operation] = u.Properties
 
-	return m.send("engage", params)
+	autoGeolocate := u.IP == ""
+
+	return m.send("engage", params, autoGeolocate)
 }
 
 func (m *mixpanel) to64(data string) string {
@@ -132,11 +136,16 @@ func (m *mixpanel) to64(data string) string {
 	return base64.StdEncoding.EncodeToString(bytes)
 }
 
-func (m *mixpanel) send(eventType string, params interface{}) error {
+func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
 	dataJSON, _ := json.Marshal(params)
 	data := string(dataJSON)
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
+
+	if autoGeolocate {
+		url += "&ip=1"
+	}
+
 	if resp, err := m.Client.Get(url); err != nil {
 		return fmt.Errorf("mixpanel: %s", err.Error())
 	} else {
