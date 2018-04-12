@@ -106,6 +106,10 @@ func (m *Mock) Update(distinctId string, u *Update) error {
 	return nil
 }
 
+func (m *Mock) Alias(distinctId, newId string) error {
+	return nil
+}
+
 type MockEvent struct {
 	Event
 	Name string
