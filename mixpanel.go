@@ -136,14 +136,12 @@ func (m *mixpanel) Update(distinctId string, u *Update) error {
 	return m.send("engage", params, autoGeolocate)
 }
 
-func (m *mixpanel) to64(data string) string {
-	bytes := []byte(data)
-	return base64.StdEncoding.EncodeToString(bytes)
+func (m *mixpanel) to64(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
 }
 
 func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
-	dataJSON, _ := json.Marshal(params)
-	data := string(dataJSON)
+	data, _ := json.Marshal(params)
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
 
