@@ -3,7 +3,6 @@ package mixpanel
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,6 +10,19 @@ import (
 )
 
 var IgnoreTime *time.Time = &time.Time{}
+
+type MixpanelError struct {
+	URL string
+	Err error
+}
+
+func (err *MixpanelError) Cause() error {
+	return err.Err
+}
+
+func (err *MixpanelError) Error() string {
+	return "mixpanel: " + err.Err.Error()
+}
 
 type ErrTrackFailed struct {
 	Body string
@@ -149,10 +161,14 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		url += "&ip=1"
 	}
 
+	wrapErr := func(err error) error {
+		return &MixpanelError{URL: url, Err: err}
+	}
+
 	resp, err := m.Client.Get(url)
 
 	if err != nil {
-		return fmt.Errorf("mixpanel: %s", err.Error())
+		return wrapErr(err)
 	}
 
 	defer resp.Body.Close()
@@ -160,11 +176,11 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 	body, bodyErr := ioutil.ReadAll(resp.Body)
 
 	if bodyErr != nil {
-		return fmt.Errorf("mixpanel: %s", bodyErr.Error())
+		return wrapErr(bodyErr)
 	}
 
 	if strBody := string(body); strBody != "1" && strBody != "1\n" {
-		return &ErrTrackFailed{Body: strBody, Resp: resp}
+		return wrapErr(&ErrTrackFailed{Body: strBody, Resp: resp})
 	}
 
 	return nil
