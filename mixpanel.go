@@ -153,7 +153,11 @@ func (m *mixpanel) to64(data []byte) string {
 }
 
 func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
-	data, _ := json.Marshal(params)
+	data, err := json.Marshal(params)
+
+	if err != nil {
+		return err
+	}
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
 
