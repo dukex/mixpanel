@@ -10,11 +10,16 @@ import (
 	"time"
 )
 
-var (
-	ErrTrackFailed = errors.New("Mixpanel did not return 1 when tracking")
+var IgnoreTime *time.Time = &time.Time{}
 
-	IgnoreTime *time.Time = &time.Time{}
-)
+type ErrTrackFailed struct {
+	Body string
+	Resp *http.Response
+}
+
+func (err *ErrTrackFailed) Error() string {
+	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Body)
+}
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel interface {
@@ -146,17 +151,22 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		url += "&ip=1"
 	}
 
-	if resp, err := m.Client.Get(url); err != nil {
+	resp, err := m.Client.Get(url)
+
+	if err != nil {
 		return fmt.Errorf("mixpanel: %s", err.Error())
-	} else {
-		defer resp.Body.Close()
-		body, bodyErr := ioutil.ReadAll(resp.Body)
-		if bodyErr != nil {
-			return fmt.Errorf("mixpanel: %s", bodyErr.Error())
-		}
-		if string(body) != "1" && string(body) != "1\n" {
-			return ErrTrackFailed
-		}
+	}
+
+	defer resp.Body.Close()
+
+	body, bodyErr := ioutil.ReadAll(resp.Body)
+
+	if bodyErr != nil {
+		return fmt.Errorf("mixpanel: %s", bodyErr.Error())
+	}
+
+	if strBody := string(body); strBody != "1" && strBody != "1\n" {
+		return &ErrTrackFailed{Body: strBody, Resp: resp}
 	}
 
 	return nil
