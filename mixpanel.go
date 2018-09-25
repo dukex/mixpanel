@@ -3,18 +3,35 @@ package mixpanel
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
 )
 
-var (
-	ErrTrackFailed = errors.New("Mixpanel did not return 1 when tracking")
+var IgnoreTime *time.Time = &time.Time{}
 
-	IgnoreTime *time.Time = &time.Time{}
-)
+type MixpanelError struct {
+	URL string
+	Err error
+}
+
+func (err *MixpanelError) Cause() error {
+	return err.Err
+}
+
+func (err *MixpanelError) Error() string {
+	return "mixpanel: " + err.Err.Error()
+}
+
+type ErrTrackFailed struct {
+	Body string
+	Resp *http.Response
+}
+
+func (err *ErrTrackFailed) Error() string {
+	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Body)
+}
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel interface {
@@ -131,14 +148,16 @@ func (m *mixpanel) Update(distinctId string, u *Update) error {
 	return m.send("engage", params, autoGeolocate)
 }
 
-func (m *mixpanel) to64(data string) string {
-	bytes := []byte(data)
-	return base64.StdEncoding.EncodeToString(bytes)
+func (m *mixpanel) to64(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
 }
 
 func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
-	dataJSON, _ := json.Marshal(params)
-	data := string(dataJSON)
+	data, err := json.Marshal(params)
+
+	if err != nil {
+		return err
+	}
 
 	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
 
@@ -146,17 +165,26 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		url += "&ip=1"
 	}
 
-	if resp, err := m.Client.Get(url); err != nil {
-		return fmt.Errorf("mixpanel: %s", err.Error())
-	} else {
-		defer resp.Body.Close()
-		body, bodyErr := ioutil.ReadAll(resp.Body)
-		if bodyErr != nil {
-			return fmt.Errorf("mixpanel: %s", bodyErr.Error())
-		}
-		if string(body) != "1" && string(body) != "1\n" {
-			return ErrTrackFailed
-		}
+	wrapErr := func(err error) error {
+		return &MixpanelError{URL: url, Err: err}
+	}
+
+	resp, err := m.Client.Get(url)
+
+	if err != nil {
+		return wrapErr(err)
+	}
+
+	defer resp.Body.Close()
+
+	body, bodyErr := ioutil.ReadAll(resp.Body)
+
+	if bodyErr != nil {
+		return wrapErr(bodyErr)
+	}
+
+	if strBody := string(body); strBody != "1" && strBody != "1\n" {
+		return wrapErr(&ErrTrackFailed{Body: strBody, Resp: resp})
 	}
 
 	return nil

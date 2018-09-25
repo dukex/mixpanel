@@ -124,13 +124,28 @@ func TestError(t *testing.T) {
 		LastRequest = r
 	}))
 
+	assertErrTrackFailed := func(err error) {
+		merr, ok := err.(*MixpanelError)
+
+		if !ok {
+			t.Errorf("Error should be wrapped in a MixpanelError: %v", err)
+			return
+		}
+
+		terr, ok := merr.Err.(*ErrTrackFailed)
+
+		if !ok {
+			t.Errorf("Error should be a *ErrTrackFailed: %v", err)
+			return
+		}
+
+		if terr.Body != "0\n" {
+			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Body)
+		}
+	}
+
 	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
 
-	if err := client.Update("1", &Update{}); err != ErrTrackFailed {
-		t.Error("Got bad error for track", err)
-	}
-
-	if err := client.Track("1", "name", &Event{}); err != ErrTrackFailed {
-		t.Error("Got bad error for track", err)
-	}
+	assertErrTrackFailed(client.Update("1", &Update{}))
+	assertErrTrackFailed(client.Track("1", "name", &Event{}))
 }
