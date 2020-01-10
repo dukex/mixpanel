@@ -63,7 +63,7 @@ func TestTrack(t *testing.T) {
 	}
 }
 
-func TestPeopleOperations(t *testing.T) {
+func TestUpdate(t *testing.T) {
 	setup()
 	defer teardown()
 
