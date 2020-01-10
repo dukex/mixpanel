@@ -91,32 +91,6 @@ func TestPeopleOperations(t *testing.T) {
 	}
 }
 
-func TestPeopleTrack(t *testing.T) {
-	setup()
-	defer teardown()
-
-	client.Track("13793", "Signed Up", &Event{
-		Properties: map[string]interface{}{
-			"Referred By": "Friend",
-		},
-	})
-
-	want := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
-
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/track"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
-}
-
 func TestError(t *testing.T) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
