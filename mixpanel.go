@@ -41,6 +41,7 @@ type Mixpanel interface {
 	// Set properties for a mixpanel user.
 	Update(distinctId string, u *Update) error
 
+	// Create an alias for an existing distinct id
 	Alias(distinctId, newId string) error
 }
 
@@ -81,7 +82,7 @@ type Update struct {
 	Properties map[string]interface{}
 }
 
-// Track create a events to current distinct id
+// Alias create an alias for an existing distinct id
 func (m *mixpanel) Alias(distinctId, newId string) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
@@ -97,7 +98,7 @@ func (m *mixpanel) Alias(distinctId, newId string) error {
 	return m.send("track", params, false)
 }
 
-// Track create a events to current distinct id
+// Track create an event for an existing distinct id
 func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
@@ -124,7 +125,7 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	return m.send("track", params, autoGeolocate)
 }
 
-// Updates a user in mixpanel. See
+// Update updates a user in mixpanel. See
 // https://mixpanel.com/help/reference/http#people-analytics-updates
 func (m *mixpanel) Update(distinctId string, u *Update) error {
 	params := map[string]interface{}{
