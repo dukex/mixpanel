@@ -204,7 +204,9 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 	}
 
 	req, _ := http.NewRequest("GET", url, nil)
-	req.SetBasicAuth(m.Secret, "")
+	if m.Secret != "" {
+		req.SetBasicAuth(m.Secret, "")
+	}
 	resp, err := m.Client.Do(req)
 
 	if err != nil {
