@@ -29,15 +29,15 @@ type ErrTrackFailed struct {
 }
 
 func (err *ErrTrackFailed) Error() string {
-	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Message)
+	return fmt.Sprintf("mixpanel did not return 1 when tracking: %s", err.Message)
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel interface {
-	// Create a mixpanel event
+	// Create a mixpanel event using the track api
 	Track(distinctId, eventName string, e *Event) error
 
-	// Create a mixpanel event, even if it's older than 5 days
+	// Create a mixpanel event using the import api
 	Import(distinctId, eventName string, e *Event) error
 
 	// Set properties for a mixpanel user.
