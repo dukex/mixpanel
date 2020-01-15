@@ -22,7 +22,7 @@ func setup() {
 		LastRequest = r
 	}))
 
-	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
+	client = New("e3bc4100330c35722740fb8c6f5abddc", "bXlhcGlzZWNyZXQ=", ts.URL)
 }
 
 func teardown() {
@@ -94,7 +94,7 @@ func TestUpdate(t *testing.T) {
 func TestError(t *testing.T) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte("0\n"))
+		w.Write([]byte(`{"error": "api_key, missing or empty", "status": 0}`))
 		LastRequest = r
 	}))
 
@@ -113,13 +113,14 @@ func TestError(t *testing.T) {
 			return
 		}
 
-		if terr.Body != "0\n" {
-			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Body)
+		if terr.Message != "api_key, missing or empty" {
+			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Message)
 		}
 	}
 
-	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
+	client = New("e3bc4100330c35722740fb8c6f5abddc", "", ts.URL)
 
 	assertErrTrackFailed(client.Update("1", &Update{}))
 	assertErrTrackFailed(client.Track("1", "name", &Event{}))
+	assertErrTrackFailed(client.Import("1", "name", &Event{}))
 }

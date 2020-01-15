@@ -3,11 +3,11 @@ package mixpanel
 import "time"
 
 func ExampleNew() {
-	New("mytoken", "")
+	New("mytoken", "myapisecret", "")
 }
 
 func ExampleMixpanel() {
-	client := New("mytoken", "")
+	client := New("mytoken", "myapisecret", "")
 
 	client.Track("1", "Sign Up", &Event{
 		Properties: map[string]interface{}{
@@ -17,7 +17,7 @@ func ExampleMixpanel() {
 }
 
 func ExamplePeople() {
-	client := New("mytoken", "")
+	client := New("mytoken", "myapisecret", "")
 
 	client.Update("1", &Update{
 		Operation: "$set",
@@ -32,6 +32,14 @@ func ExamplePeople() {
 	client.Track("1", "Sign Up", &Event{
 		Properties: map[string]interface{}{
 			"from": "email",
+		},
+	})
+
+	importTimestamp := time.Now().Add(-5 * 24 * time.Hour)
+	client.Import("1", "Sign Up", &Event{
+		Timestamp: &importTimestamp,
+		Properties: map[string]interface{}{
+			"subject": "topic",
 		},
 	})
 }
