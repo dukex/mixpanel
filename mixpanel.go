@@ -25,12 +25,11 @@ func (err *MixpanelError) Error() string {
 }
 
 type ErrTrackFailed struct {
-	Body string
-	Resp *http.Response
+	Message string
 }
 
 func (err *ErrTrackFailed) Error() string {
-	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Body)
+	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Message)
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
@@ -160,7 +159,7 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return err
 	}
 
-	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
+	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data) + "&verbose=1"
 
 	if autoGeolocate {
 		url += "&ip=1"
@@ -184,8 +183,16 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return wrapErr(bodyErr)
 	}
 
-	if strBody := string(body); strBody != "1" && strBody != "1\n" {
-		return wrapErr(&ErrTrackFailed{Body: strBody, Resp: resp})
+	type verboseResponse struct {
+		Error  string `json:"error"`
+		Status int    `json:"status"`
+	}
+
+	var jsonBody verboseResponse
+	json.Unmarshal(body, &jsonBody)
+
+	if jsonBody.Status != 1 {
+		return wrapErr(&ErrTrackFailed{Message: jsonBody.Error})
 	}
 
 	return nil
