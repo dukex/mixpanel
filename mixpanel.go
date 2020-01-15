@@ -37,6 +37,9 @@ type Mixpanel interface {
 	// Create a mixpanel event
 	Track(distinctId, eventName string, e *Event) error
 
+	// Create a mixpanel event, even if it's older than 5 days
+	Import(distinctId, eventName string, e *Event) error
+
 	// Set properties for a mixpanel user.
 	Update(distinctId string, u *Update) error
 
@@ -123,6 +126,36 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	autoGeolocate := e.IP == ""
 
 	return m.send("track", params, autoGeolocate)
+}
+
+// Import create an event for an existing distinct id, even if the event is older than 5 days.
+// See https://developer.mixpanel.com/docs/importing-old-events
+func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
+	if e.Timestamp == nil || time.Since(*e.Timestamp) < 5*24*time.Hour {
+		return m.Track(distinctId, eventName, e)
+	}
+
+	props := map[string]interface{}{
+		"token":       m.Token,
+		"distinct_id": distinctId,
+		"time":        e.Timestamp.Unix(),
+	}
+	if e.IP != "" {
+		props["ip"] = e.IP
+	}
+
+	for key, value := range e.Properties {
+		props[key] = value
+	}
+
+	params := map[string]interface{}{
+		"event":      eventName,
+		"properties": props,
+	}
+
+	autoGeolocate := e.IP == ""
+
+	return m.send("import", params, autoGeolocate)
 }
 
 // Update updates a user in mixpanel. See

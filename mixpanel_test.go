@@ -2,11 +2,13 @@ package mixpanel
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -60,6 +62,65 @@ func TestTrack(t *testing.T) {
 	if !reflect.DeepEqual(path, want) {
 		t.Errorf("path returned %+v, want %+v",
 			path, want)
+	}
+}
+
+func TestImport(t *testing.T) {
+	setup()
+	defer teardown()
+
+	eventBase := &Event{
+		Properties: map[string]interface{}{
+			"Referred By": "Friend",
+		},
+	}
+
+	trackTime := time.Now().Add(-4 * 24 * time.Hour)
+	importTime := time.Now().Add(-5 * 24 * time.Hour)
+
+	tests := []struct {
+		name             string
+		eventTimestamp   *time.Time
+		expectedEvent    string
+		expectedEndpoint string
+	}{
+		{
+			name: "no timestamp",
+			eventTimestamp: nil,
+			expectedEvent: "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}",
+			expectedEndpoint: "/track",
+		},
+		{
+			name:       "timestamp not older than 5 days",
+			eventTimestamp: &trackTime,
+			expectedEvent: fmt.Sprintf("{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"time\":%d,\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}", trackTime.Unix()),
+			expectedEndpoint: "/track",
+		},
+		{
+			name:       "timestamp older than 5 days",
+			eventTimestamp: &importTime,
+			expectedEvent: fmt.Sprintf("{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"time\":%d,\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}", importTime.Unix()),
+			expectedEndpoint: "/import",
+		},
+	}
+
+	for _, item := range tests {
+		t.Run(item.name, func(t *testing.T) {
+			event := eventBase
+			event.Timestamp = item.eventTimestamp
+			client.Import("13793", "Signed Up", event)
+
+			if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), item.expectedEvent) {
+				t.Errorf("%s: LastRequest.URL returned %+v, want %+v",
+					item.name, decodeURL(LastRequest.URL.String()), item.expectedEvent)
+			}
+
+			path := LastRequest.URL.Path
+			if !reflect.DeepEqual(path, item.expectedEndpoint) {
+				t.Errorf("%s: path returned %+v, want %+v",
+					item.name, path, item.expectedEndpoint)
+			}
+		})
 	}
 }
 
