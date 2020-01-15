@@ -236,13 +236,24 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 
 // New returns the client instance. If apiURL is blank, the default will be used
 // ("https://api.mixpanel.com").
-func New(token, secret, apiURL string) Mixpanel {
-	return NewFromClient(http.DefaultClient, token, secret, apiURL)
+func New(token, apiURL string) Mixpanel {
+	return NewFromClient(http.DefaultClient, token, apiURL)
 }
 
-// Creates a client instance using the specified client instance. This is useful
+// NewWithSecret returns the client instance using a secret.If apiURL is blank,
+// the default will be used ("https://api.mixpanel.com").
+func NewWithSecret(token, secret, apiURL string) Mixpanel {
+	return NewFromClientWithSecret(http.DefaultClient, token, secret, apiURL)
+}
+
+// NewFromClient creates a client instance using the specified client instance. This is useful
 // when using a proxy.
-func NewFromClient(c *http.Client, token, secret, apiURL string) Mixpanel {
+func NewFromClient(c *http.Client, token, apiURL string) Mixpanel {
+	return NewFromClientWithSecret(c, token, "", apiURL)
+}
+
+// NewFromClientWithSecret creates a client instance using the specified client instance and secret.
+func NewFromClientWithSecret(c *http.Client, token, secret, apiURL string) Mixpanel {
 	if apiURL == "" {
 		apiURL = "https://api.mixpanel.com"
 	}

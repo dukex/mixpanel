@@ -3,11 +3,15 @@ package mixpanel
 import "time"
 
 func ExampleNew() {
-	New("mytoken", "myapisecret", "")
+	New("mytoken", "")
+}
+
+func ExampleNewWithSecret() {
+	NewWithSecret("mytoken", "myapisecret", "")
 }
 
 func ExampleMixpanel() {
-	client := New("mytoken", "myapisecret", "")
+	client := New("mytoken", "")
 
 	client.Track("1", "Sign Up", &Event{
 		Properties: map[string]interface{}{
@@ -17,7 +21,7 @@ func ExampleMixpanel() {
 }
 
 func ExamplePeople() {
-	client := New("mytoken", "myapisecret", "")
+	client := NewWithSecret("mytoken", "myapisecret", "")
 
 	client.Update("1", &Update{
 		Operation: "$set",
