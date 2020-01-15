@@ -128,20 +128,18 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	return m.send("track", params, autoGeolocate)
 }
 
-// Import create an event for an existing distinct id, even if the event is older than 5 days.
+// Import create an event for an existing distinct id
 // See https://developer.mixpanel.com/docs/importing-old-events
 func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
-	if e.Timestamp == nil || time.Since(*e.Timestamp) < 5*24*time.Hour {
-		return m.Track(distinctId, eventName, e)
-	}
-
 	props := map[string]interface{}{
 		"token":       m.Token,
 		"distinct_id": distinctId,
-		"time":        e.Timestamp.Unix(),
 	}
 	if e.IP != "" {
 		props["ip"] = e.IP
+	}
+	if e.Timestamp != nil {
+		props["time"] = e.Timestamp.Unix()
 	}
 
 	for key, value := range e.Properties {
