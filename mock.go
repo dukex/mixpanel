@@ -48,6 +48,15 @@ func (m *Mock) Track(distinctId, eventName string, e *Event) error {
 	return nil
 }
 
+func (m *Mock) Import(distinctId, eventName string, e *Event) error {
+	p := m.people(distinctId)
+	p.Events = append(p.Events, MockEvent{
+		Event: *e,
+		Name:  eventName,
+	})
+	return nil
+}
+
 type MockPeople struct {
 	Properties map[string]interface{}
 	Time       *time.Time
