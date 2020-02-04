@@ -2,11 +2,13 @@ package mixpanel
 
 import (
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 var (
@@ -22,7 +24,7 @@ func setup() {
 		LastRequest = r
 	}))
 
-	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
+	client = NewWithSecret("e3bc4100330c35722740fb8c6f5abddc", "mysecret", ts.URL)
 }
 
 func teardown() {
@@ -63,7 +65,36 @@ func TestTrack(t *testing.T) {
 	}
 }
 
-func TestPeopleOperations(t *testing.T) {
+func TestImport(t *testing.T) {
+	setup()
+	defer teardown()
+
+	importTime := time.Now().Add(-5 * 24 * time.Hour)
+
+	client.Import("13793", "Signed Up", &Event{
+		Properties: map[string]interface{}{
+			"Referred By": "Friend",
+		},
+		Timestamp: &importTime,
+	})
+
+	want := fmt.Sprintf("{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"time\":%d,\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}", importTime.Unix())
+
+	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
+		t.Errorf("LastRequest.URL returned %+v, want %+v",
+			decodeURL(LastRequest.URL.String()), want)
+	}
+
+	want = "/import"
+	path := LastRequest.URL.Path
+
+	if !reflect.DeepEqual(path, want) {
+		t.Errorf("path returned %+v, want %+v",
+			path, want)
+	}
+}
+
+func TestUpdate(t *testing.T) {
 	setup()
 	defer teardown()
 
@@ -91,36 +122,10 @@ func TestPeopleOperations(t *testing.T) {
 	}
 }
 
-func TestPeopleTrack(t *testing.T) {
-	setup()
-	defer teardown()
-
-	client.Track("13793", "Signed Up", &Event{
-		Properties: map[string]interface{}{
-			"Referred By": "Friend",
-		},
-	})
-
-	want := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
-
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/track"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
-}
-
 func TestError(t *testing.T) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
-		w.Write([]byte("0\n"))
+		w.Write([]byte(`{"error": "some error", "status": 0}`))
 		LastRequest = r
 	}))
 
@@ -139,8 +144,8 @@ func TestError(t *testing.T) {
 			return
 		}
 
-		if terr.Body != "0\n" {
-			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Body)
+		if terr.Message != "some error" {
+			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Message)
 		}
 	}
 
@@ -148,4 +153,5 @@ func TestError(t *testing.T) {
 
 	assertErrTrackFailed(client.Update("1", &Update{}))
 	assertErrTrackFailed(client.Track("1", "name", &Event{}))
+	assertErrTrackFailed(client.Import("1", "name", &Event{}))
 }
