@@ -228,7 +228,8 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 	json.Unmarshal(body, &jsonBody)
 
 	if jsonBody.Status != 1 {
-		return wrapErr(&ErrTrackFailed{Message: jsonBody.Error})
+		errMsg := fmt.Sprintf("error=%s; status=%d; httpCode=%d", jsonBody.Error, jsonBody.Status, resp.StatusCode)
+		return wrapErr(&ErrTrackFailed{Message: errMsg})
 	}
 
 	return nil
