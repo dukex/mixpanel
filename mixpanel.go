@@ -1,6 +1,7 @@
 package mixpanel
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -45,14 +46,21 @@ type Mixpanel interface {
 
 	// Create an alias for an existing distinct id
 	Alias(distinctId, newId string) error
+
+	SetProjectID(string)
+
+	SetAuth(username string, password string)
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type mixpanel struct {
-	Client *http.Client
-	Token  string
-	Secret string
-	ApiURL string
+	Client    *http.Client
+	Token     string
+	Secret    string
+	ApiURL    string
+	ProjectID string
+	AuthUser  string
+	AuthPass  string
 }
 
 // A mixpanel event
@@ -68,7 +76,7 @@ type Event struct {
 	Properties map[string]interface{}
 }
 
-// An update of a user in mixpanel
+// Update will update of a user in mixpanel
 type Update struct {
 	// IP-address of the user. Leave empty to use autodetect, or set to "0" to
 	// not specify an ip-address at all.
@@ -98,7 +106,11 @@ func (m *mixpanel) Alias(distinctId, newId string) error {
 		"properties": props,
 	}
 
-	return m.send("track", params, false)
+	a := []interface{}{
+		params,
+	}
+
+	return m.send("track", a, false)
 }
 
 // Track create an event for an existing distinct id
@@ -125,7 +137,11 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 
 	autoGeolocate := e.IP == ""
 
-	return m.send("track", params, autoGeolocate)
+	a := []interface{}{
+		params,
+	}
+
+	return m.send("track", a, autoGeolocate)
 }
 
 // Import create an event for an existing distinct id
@@ -153,7 +169,11 @@ func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
 
 	autoGeolocate := e.IP == ""
 
-	return m.send("import", params, autoGeolocate)
+	a := []interface{}{
+		params,
+	}
+
+	return m.send("import", a, autoGeolocate)
 }
 
 // Update updates a user in mixpanel. See
@@ -177,21 +197,25 @@ func (m *mixpanel) Update(distinctId string, u *Update) error {
 
 	autoGeolocate := u.IP == ""
 
-	return m.send("engage", params, autoGeolocate)
+	a := []interface{}{
+		params,
+	}
+
+	return m.send("engage", a, autoGeolocate)
 }
 
 func (m *mixpanel) to64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
-func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
+func (m *mixpanel) send(eventType string, params []interface{}, autoGeolocate bool) error {
 	data, err := json.Marshal(params)
 
 	if err != nil {
 		return err
 	}
 
-	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data) + "&verbose=1"
+	url := m.ApiURL + "/" + eventType + "?project_id=" + m.ProjectID
 
 	if autoGeolocate {
 		url += "&ip=1"
@@ -201,10 +225,15 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return &MixpanelError{URL: url, Err: err}
 	}
 
-	req, _ := http.NewRequest("GET", url, nil)
-	if m.Secret != "" {
+	req, _ := http.NewRequest("POST", url, bytes.NewReader(data))
+	req.Header.Add("Content-Type", "application/json")
+
+	if m.AuthUser != "" && m.AuthPass != "" {
+		req.SetBasicAuth(m.AuthUser, m.AuthPass)
+	} else if m.Secret != "" {
 		req.SetBasicAuth(m.Secret, "")
 	}
+
 	resp, err := m.Client.Do(req)
 
 	if err != nil {
@@ -219,20 +248,21 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return wrapErr(bodyErr)
 	}
 
-	type verboseResponse struct {
-		Error  string `json:"error"`
-		Status int    `json:"status"`
-	}
-
-	var jsonBody verboseResponse
-	json.Unmarshal(body, &jsonBody)
-
-	if jsonBody.Status != 1 {
-		errMsg := fmt.Sprintf("error=%s; status=%d; httpCode=%d", jsonBody.Error, jsonBody.Status, resp.StatusCode)
+	if string(body) != "1" {
+		errMsg := fmt.Sprintf("body=%d; httpCode=%d", body, resp.StatusCode)
 		return wrapErr(&ErrTrackFailed{Message: errMsg})
 	}
 
 	return nil
+}
+
+func (m *mixpanel) SetProjectID(ID string) {
+	m.ProjectID = ID
+}
+
+func (m *mixpanel) SetAuth(username string, password string) {
+	m.AuthUser = username
+	m.AuthPass = password
 }
 
 // New returns the client instance. If apiURL is blank, the default will be used
