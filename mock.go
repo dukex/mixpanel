@@ -85,6 +85,10 @@ func (mp *MockPeople) String() string {
 }
 
 func (m *Mock) Update(distinctId string, u *Update) error {
+	return m.UpdateUser(distinctId, u)
+}
+
+func (m *Mock) UpdateUser(distinctId string, u *Update) error {
 	p := m.people(distinctId)
 
 	if u.IP != "" {
@@ -103,6 +107,10 @@ func (m *Mock) Update(distinctId string, u *Update) error {
 		return errors.New("mixpanel.Mock only supports the $set operation")
 	}
 
+	return nil
+}
+
+func (m *Mock) UpdateGroup(groupKey, groupUser string, u *Update) error {
 	return nil
 }
 

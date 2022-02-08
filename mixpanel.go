@@ -160,6 +160,20 @@ func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 	return m.send("engage", params, autoGeolocate)
 }
 
+// UpdateUser: Updates a group in mixpanel. See
+// https://api.mixpanel.com/groups#group-set
+func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
+	params := map[string]interface{}{
+		"$token":     m.Token,
+		"$group_id":  groupId,
+		"$group_key": groupKey,
+	}
+
+	params[u.Operation] = u.Properties
+
+	return m.send("groups", params, false)
+}
+
 func (m *mixpanel) to64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
