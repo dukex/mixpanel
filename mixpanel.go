@@ -39,7 +39,14 @@ type Mixpanel interface {
 	Track(distinctId, eventName string, e *Event) error
 
 	// Set properties for a mixpanel user.
+	// Deprecated: Use UpdateUser instead
 	Update(distinctId string, u *Update) error
+
+	// Set properties for a mixpanel user.
+	UpdateUser(distinctId string, u *Update) error
+
+	// Set properties for a mixpanel group.
+	UpdateGroup(groupKey, groupId string, u *Update) error
 
 	Alias(distinctId, newId string) error
 }
@@ -124,9 +131,14 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	return m.send("track", params, autoGeolocate)
 }
 
-// Updates a user in mixpanel. See
-// https://mixpanel.com/help/reference/http#people-analytics-updates
+// Deprecated: Use UpdateUser instead
 func (m *mixpanel) Update(distinctId string, u *Update) error {
+	return m.UpdateUser(distinctId, u)
+}
+
+// UpdateUser: Updates a user in mixpanel. See
+// https://mixpanel.com/help/reference/http#people-analytics-updates
+func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":       m.Token,
 		"$distinct_id": distinctId,
