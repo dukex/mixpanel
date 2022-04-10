@@ -48,6 +48,15 @@ func (m *Mock) Track(distinctId, eventName string, e *Event) error {
 	return nil
 }
 
+func (m *Mock) Import(distinctId, eventName string, e *Event) error {
+	p := m.people(distinctId)
+	p.Events = append(p.Events, MockEvent{
+		Event: *e,
+		Name:  eventName,
+	})
+	return nil
+}
+
 type MockPeople struct {
 	Properties map[string]interface{}
 	Time       *time.Time
@@ -99,12 +108,12 @@ func (m *Mock) UpdateUser(distinctId string, u *Update) error {
 	}
 
 	switch u.Operation {
-	case "$set":
+	case "$set", "$set_once":
 		for key, val := range u.Properties {
 			p.Properties[key] = val
 		}
 	default:
-		return errors.New("mixpanel.Mock only supports the $set operation")
+		return errors.New("mixpanel.Mock only supports the $set and $set_once operations")
 	}
 
 	return nil

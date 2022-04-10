@@ -28,6 +28,14 @@ func ExampleMock() {
 		},
 	})
 
+	client.Import("1", "Sign Up", &Event{
+		IP: "1.2.3.4",
+		Timestamp: &t,
+		Properties: map[string]interface{}{
+			"imported": true,
+		},
+	})
+
 	fmt.Println(client)
 
 	// Output:
@@ -41,4 +49,9 @@ func ExampleMock() {
 	//       IP: 1.2.3.4
 	//       Timestamp:
 	//       from: email
+	//     Sign Up:
+	//       IP: 1.2.3.4
+	//       Timestamp: 2016-03-03T15:17:53+01:00
+	//       imported: true
+
 }

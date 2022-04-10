@@ -25,18 +25,20 @@ func (err *MixpanelError) Error() string {
 }
 
 type ErrTrackFailed struct {
-	Body string
-	Resp *http.Response
+	Message string
 }
 
 func (err *ErrTrackFailed) Error() string {
-	return fmt.Sprintf("Mixpanel did not return 1 when tracking: %s", err.Body)
+	return fmt.Sprintf("mixpanel did not return 1 when tracking: %s", err.Message)
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel interface {
-	// Create a mixpanel event
+	// Create a mixpanel event using the track api
 	Track(distinctId, eventName string, e *Event) error
+
+	// Create a mixpanel event using the import api
+	Import(distinctId, eventName string, e *Event) error
 
 	// Set properties for a mixpanel user.
 	// Deprecated: Use UpdateUser instead
@@ -48,6 +50,7 @@ type Mixpanel interface {
 	// Set properties for a mixpanel group.
 	UpdateGroup(groupKey, groupId string, u *Update) error
 
+	// Create an alias for an existing distinct id
 	Alias(distinctId, newId string) error
 }
 
@@ -55,6 +58,7 @@ type Mixpanel interface {
 type mixpanel struct {
 	Client *http.Client
 	Token  string
+	Secret string
 	ApiURL string
 }
 
@@ -88,7 +92,7 @@ type Update struct {
 	Properties map[string]interface{}
 }
 
-// Track create a events to current distinct id
+// Alias create an alias for an existing distinct id
 func (m *mixpanel) Alias(distinctId, newId string) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
@@ -104,7 +108,7 @@ func (m *mixpanel) Alias(distinctId, newId string) error {
 	return m.send("track", params, false)
 }
 
-// Track create a events to current distinct id
+// Track create an event for an existing distinct id
 func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
@@ -131,6 +135,36 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	return m.send("track", params, autoGeolocate)
 }
 
+// Import create an event for an existing distinct id
+// See https://developer.mixpanel.com/docs/importing-old-events
+func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
+	props := map[string]interface{}{
+		"token":       m.Token,
+		"distinct_id": distinctId,
+	}
+	if e.IP != "" {
+		props["ip"] = e.IP
+	}
+	if e.Timestamp != nil {
+		props["time"] = e.Timestamp.Unix()
+	}
+
+	for key, value := range e.Properties {
+		props[key] = value
+	}
+
+	params := map[string]interface{}{
+		"event":      eventName,
+		"properties": props,
+	}
+
+	autoGeolocate := e.IP == ""
+
+	return m.send("import", params, autoGeolocate)
+}
+
+// Update updates a user in mixpanel. See
+// https://mixpanel.com/help/reference/http#people-analytics-updates
 // Deprecated: Use UpdateUser instead
 func (m *mixpanel) Update(distinctId string, u *Update) error {
 	return m.UpdateUser(distinctId, u)
@@ -185,7 +219,7 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return err
 	}
 
-	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data)
+	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data) + "&verbose=1"
 
 	if autoGeolocate {
 		url += "&ip=1"
@@ -195,7 +229,11 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return &MixpanelError{URL: url, Err: err}
 	}
 
-	resp, err := m.Client.Get(url)
+	req, _ := http.NewRequest("GET", url, nil)
+	if m.Secret != "" {
+		req.SetBasicAuth(m.Secret, "")
+	}
+	resp, err := m.Client.Do(req)
 
 	if err != nil {
 		return wrapErr(err)
@@ -209,8 +247,17 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return wrapErr(bodyErr)
 	}
 
-	if strBody := string(body); strBody != "1" && strBody != "1\n" {
-		return wrapErr(&ErrTrackFailed{Body: strBody, Resp: resp})
+	type verboseResponse struct {
+		Error  string `json:"error"`
+		Status int    `json:"status"`
+	}
+
+	var jsonBody verboseResponse
+	json.Unmarshal(body, &jsonBody)
+
+	if jsonBody.Status != 1 {
+		errMsg := fmt.Sprintf("error=%s; status=%d; httpCode=%d", jsonBody.Error, jsonBody.Status, resp.StatusCode)
+		return wrapErr(&ErrTrackFailed{Message: errMsg})
 	}
 
 	return nil
@@ -222,9 +269,20 @@ func New(token, apiURL string) Mixpanel {
 	return NewFromClient(http.DefaultClient, token, apiURL)
 }
 
-// Creates a client instance using the specified client instance. This is useful
+// NewWithSecret returns the client instance using a secret.If apiURL is blank,
+// the default will be used ("https://api.mixpanel.com").
+func NewWithSecret(token, secret, apiURL string) Mixpanel {
+	return NewFromClientWithSecret(http.DefaultClient, token, secret, apiURL)
+}
+
+// NewFromClient creates a client instance using the specified client instance. This is useful
 // when using a proxy.
 func NewFromClient(c *http.Client, token, apiURL string) Mixpanel {
+	return NewFromClientWithSecret(c, token, "", apiURL)
+}
+
+// NewFromClientWithSecret creates a client instance using the specified client instance and secret.
+func NewFromClientWithSecret(c *http.Client, token, secret, apiURL string) Mixpanel {
 	if apiURL == "" {
 		apiURL = "https://api.mixpanel.com"
 	}
@@ -232,6 +290,7 @@ func NewFromClient(c *http.Client, token, apiURL string) Mixpanel {
 	return &mixpanel{
 		Client: c,
 		Token:  token,
+		Secret: secret,
 		ApiURL: apiURL,
 	}
 }
