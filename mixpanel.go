@@ -41,7 +41,14 @@ type Mixpanel interface {
 	Import(distinctId, eventName string, e *Event) error
 
 	// Set properties for a mixpanel user.
+	// Deprecated: Use UpdateUser instead
 	Update(distinctId string, u *Update) error
+
+	// Set properties for a mixpanel user.
+	UpdateUser(distinctId string, u *Update) error
+
+	// Set properties for a mixpanel group.
+	UpdateGroup(groupKey, groupId string, u *Update) error
 
 	// Create an alias for an existing distinct id
 	Alias(distinctId, newId string) error
@@ -158,7 +165,14 @@ func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
 
 // Update updates a user in mixpanel. See
 // https://mixpanel.com/help/reference/http#people-analytics-updates
+// Deprecated: Use UpdateUser instead
 func (m *mixpanel) Update(distinctId string, u *Update) error {
+	return m.UpdateUser(distinctId, u)
+}
+
+// UpdateUser: Updates a user in mixpanel. See
+// https://mixpanel.com/help/reference/http#people-analytics-updates
+func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":       m.Token,
 		"$distinct_id": distinctId,
@@ -178,6 +192,20 @@ func (m *mixpanel) Update(distinctId string, u *Update) error {
 	autoGeolocate := u.IP == ""
 
 	return m.send("engage", params, autoGeolocate)
+}
+
+// UpdateGroup: Updates a group in mixpanel. See
+// https://api.mixpanel.com/groups#group-set
+func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
+	params := map[string]interface{}{
+		"$token":     m.Token,
+		"$group_id":  groupId,
+		"$group_key": groupKey,
+	}
+
+	params[u.Operation] = u.Properties
+
+	return m.send("groups", params, false)
 }
 
 func (m *mixpanel) to64(data []byte) string {

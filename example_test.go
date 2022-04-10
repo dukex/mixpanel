@@ -23,7 +23,7 @@ func ExampleMixpanel() {
 func ExamplePeople() {
 	client := NewWithSecret("mytoken", "myapisecret", "")
 
-	client.Update("1", &Update{
+	client.UpdateUser("1", &Update{
 		Operation: "$set",
 		Properties: map[string]interface{}{
 			"$email":       "user@email.com",
