@@ -160,7 +160,7 @@ func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 	return m.send("engage", params, autoGeolocate)
 }
 
-// UpdateUser: Updates a group in mixpanel. See
+// UpdateGroup: Updates a group in mixpanel. See
 // https://api.mixpanel.com/groups#group-set
 func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
 	params := map[string]interface{}{
