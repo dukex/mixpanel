@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -219,22 +220,20 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return err
 	}
 
-	url := m.ApiURL + "/" + eventType + "?data=" + m.to64(data) + "&verbose=1"
-
-	if autoGeolocate {
-		url += "&ip=1"
-	}
+	url := m.ApiURL + "/" + eventType + "?verbose=1"
 
 	wrapErr := func(err error) error {
 		return &MixpanelError{URL: url, Err: err}
 	}
 
-	req, _ := http.NewRequest("GET", url, nil)
-	if m.Secret != "" {
-		req.SetBasicAuth(m.Secret, "")
+	request, err := http.NewRequest("POST", url, strings.NewReader("data="+m.to64(data)))
+	if err != nil {
+		return wrapErr(err)
 	}
-	resp, err := m.Client.Do(req)
-
+	if m.Secret != "" {
+		request.SetBasicAuth(m.Secret, "")
+	}
+	resp, err := m.Client.Do(request)
 	if err != nil {
 		return wrapErr(err)
 	}
