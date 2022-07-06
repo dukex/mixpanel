@@ -29,7 +29,7 @@ func ExampleMock() {
 	})
 
 	client.Import("1", "Sign Up", &Event{
-		IP: "1.2.3.4",
+		IP:        "1.2.3.4",
 		Timestamp: &t,
 		Properties: map[string]interface{}{
 			"imported": true,

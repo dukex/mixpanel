@@ -3,6 +3,7 @@ package mixpanel
 import (
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -11,17 +12,26 @@ import (
 	"time"
 )
 
+type Request struct {
+	*http.Request
+	DecodedBody string
+}
+
 var (
 	ts          *httptest.Server
 	client      Mixpanel
-	LastRequest *http.Request
+	LastRequest *Request
 )
 
 func setup() {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte("1\n"))
-		LastRequest = r
+		body, _ := io.ReadAll(r.Body)
+		LastRequest = &Request{
+			r,
+			decodeData(string(body)),
+		}
 	}))
 
 	client = NewWithSecret("e3bc4100330c35722740fb8c6f5abddc", "mysecret", ts.URL)
@@ -31,13 +41,18 @@ func teardown() {
 	ts.Close()
 }
 
-func decodeURL(url string) string {
+func decodeData(url string) string {
 	data := strings.Split(url, "data=")[1]
 	decoded, _ := base64.StdEncoding.DecodeString(data)
 	return string(decoded[:])
 }
 
-// examples from https://mixpanel.com/help/reference/http
+func assert(t *testing.T, desc string, current interface{}, wanted interface{}) {
+	if !reflect.DeepEqual(current, wanted) {
+		t.Errorf("%s returned %+v, want %+v", desc,
+			current, wanted)
+	}
+}
 
 func TestTrack(t *testing.T) {
 	setup()
@@ -49,20 +64,10 @@ func TestTrack(t *testing.T) {
 		},
 	})
 
-	want := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
+	wantedBody := "{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}"
 
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/track"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
+	assert(t, "body", LastRequest.DecodedBody, wantedBody)
+	assert(t, "path", LastRequest.URL.Path, "/track")
 }
 
 func TestImport(t *testing.T) {
@@ -78,20 +83,10 @@ func TestImport(t *testing.T) {
 		Timestamp: &importTime,
 	})
 
-	want := fmt.Sprintf("{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"time\":%d,\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}", importTime.Unix())
+	wantedBody := fmt.Sprintf("{\"event\":\"Signed Up\",\"properties\":{\"Referred By\":\"Friend\",\"distinct_id\":\"13793\",\"time\":%d,\"token\":\"e3bc4100330c35722740fb8c6f5abddc\"}}", importTime.Unix())
 
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/import"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
+	assert(t, "body", LastRequest.DecodedBody, wantedBody)
+	assert(t, "path", LastRequest.URL.Path, "/import")
 }
 
 func TestGroupOperations(t *testing.T) {
@@ -106,20 +101,10 @@ func TestGroupOperations(t *testing.T) {
 		},
 	})
 
-	want := "{\"$group_id\":\"11\",\"$group_key\":\"company_id\",\"$set\":{\"Address\":\"1313 Mockingbird Lane\",\"Birthday\":\"1948-01-01\"},\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
+	wantedBody := "{\"$group_id\":\"11\",\"$group_key\":\"company_id\",\"$set\":{\"Address\":\"1313 Mockingbird Lane\",\"Birthday\":\"1948-01-01\"},\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
 
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/groups"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
+	assert(t, "body", LastRequest.DecodedBody, wantedBody)
+	assert(t, "path", LastRequest.URL.Path, "/groups")
 }
 
 func TestUpdate(t *testing.T) {
@@ -134,27 +119,17 @@ func TestUpdate(t *testing.T) {
 		},
 	})
 
-	want := "{\"$distinct_id\":\"13793\",\"$set\":{\"Address\":\"1313 Mockingbird Lane\",\"Birthday\":\"1948-01-01\"},\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
+	wantedBody := "{\"$distinct_id\":\"13793\",\"$set\":{\"Address\":\"1313 Mockingbird Lane\",\"Birthday\":\"1948-01-01\"},\"$token\":\"e3bc4100330c35722740fb8c6f5abddc\"}"
 
-	if !reflect.DeepEqual(decodeURL(LastRequest.URL.String()), want) {
-		t.Errorf("LastRequest.URL returned %+v, want %+v",
-			decodeURL(LastRequest.URL.String()), want)
-	}
-
-	want = "/engage"
-	path := LastRequest.URL.Path
-
-	if !reflect.DeepEqual(path, want) {
-		t.Errorf("path returned %+v, want %+v",
-			path, want)
-	}
+	assert(t, "body", LastRequest.DecodedBody, wantedBody)
+	assert(t, "path", LastRequest.URL.Path, "/engage")
 }
 
 func TestError(t *testing.T) {
 	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		w.Write([]byte(`{"error": "some error", "status": 0}`))
-		LastRequest = r
+		LastRequest = &Request{r, ""}
 	}))
 
 	assertErrTrackFailed := func(err error) {
@@ -172,9 +147,7 @@ func TestError(t *testing.T) {
 			return
 		}
 
-		if terr.Message != "some error" {
-			t.Errorf("Wrong body carried in the *ErrTrackFailed: %q", terr.Message)
-		}
+		assert(t, "error", "error=some error; status=0; httpCode=200", terr.Message)
 	}
 
 	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
