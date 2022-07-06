@@ -107,11 +107,11 @@ func TestGroupOperations(t *testing.T) {
 	assert(t, "path", LastRequest.URL.Path, "/groups")
 }
 
-func TestUpdate(t *testing.T) {
+func TestUpdateUser(t *testing.T) {
 	setup()
 	defer teardown()
 
-	client.Update("13793", &Update{
+	client.UpdateUser("13793", &Update{
 		Operation: "$set",
 		Properties: map[string]interface{}{
 			"Address":  "1313 Mockingbird Lane",
@@ -152,7 +152,7 @@ func TestError(t *testing.T) {
 
 	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
 
-	assertErrTrackFailed(client.Update("1", &Update{}))
+	assertErrTrackFailed(client.UpdateUser("1", &Update{}))
 	assertErrTrackFailed(client.Track("1", "name", &Event{}))
 	assertErrTrackFailed(client.Import("1", "name", &Event{}))
 }

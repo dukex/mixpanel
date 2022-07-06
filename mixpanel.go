@@ -53,6 +53,12 @@ type Mixpanel interface {
 
 	// Create an alias for an existing distinct id
 	Alias(distinctId, newId string) error
+
+	// Unions a profile property in mixpanel
+	UnionUser(distinctId string, u *Update) error
+
+	// Unions a group property in mixpanel
+	UnionGroup(groupId, groupKey string, u *Update) error
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
@@ -192,7 +198,7 @@ func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 
 	autoGeolocate := u.IP == ""
 
-	return m.send("engage", params, autoGeolocate)
+	return m.send("engage#profile-set", params, autoGeolocate)
 }
 
 // UpdateGroup: Updates a group in mixpanel. See
@@ -206,7 +212,34 @@ func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
 
 	params[u.Operation] = u.Properties
 
-	return m.send("groups", params, false)
+	return m.send("groups#group-set", params, false)
+}
+
+// UnionUser: Unions a profile property in mixpanel. See
+// https://api.mixpanel.com/engage#profile-union
+func (m *mixpanel) UnionUser(userID string, u *Update) error {
+	params := map[string]interface{}{
+		"$token":       m.Token,
+		"$distinct_id": userID,
+	}
+
+	params[u.Operation] = u.Properties
+
+	return m.send("engage#profile-union", params, false)
+}
+
+// UnionGroup: Unions a group property in mixpanel. See
+// https://api.mixpanel.com/groups#group-union
+func (m *mixpanel) UnionGroup(groupId, groupKey string, u *Update) error {
+	params := map[string]interface{}{
+		"$token":     m.Token,
+		"$group_id":  groupId,
+		"$group_key": groupKey,
+	}
+
+	params[u.Operation] = u.Properties
+
+	return m.send("groups#group-union", params, false)
 }
 
 func (m *mixpanel) to64(data []byte) string {

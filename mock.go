@@ -119,7 +119,15 @@ func (m *Mock) UpdateUser(distinctId string, u *Update) error {
 	return nil
 }
 
+func (m *Mock) UnionUser(userID string, u *Update) error {
+	return nil
+}
+
 func (m *Mock) UpdateGroup(groupKey, groupUser string, u *Update) error {
+	return nil
+}
+
+func (m *Mock) UnionGroup(groupKey, groupUser string, u *Update) error {
 	return nil
 }
 
