@@ -3,44 +3,46 @@ package mixpanel
 import (
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
-// Mocked version of Mixpanel which can be used in unit tests.
+// Mock Mixpanel client which can be used in unit tests.
 type Mock struct {
-	// All People identified, mapped by distinctId
-	People map[string]*MockPeople
+	// All people identified, mapped by distinctId
+	people sync.Map
 }
 
 func NewMock() *Mock {
 	return &Mock{
-		People: map[string]*MockPeople{},
+		people: sync.Map{},
 	}
 }
 
 func (m *Mock) String() string {
 	str := ""
-	for id, p := range m.People {
-		str += id + ":\n" + p.String()
-	}
+	m.people.Range(func(id, p interface{}) bool {
+		str += id.(string) + ":\n" + p.(*MockPeople).String()
+		return true
+	})
 	return str
 }
 
-// Identifies a user. The user will be added to the People map.
-func (m *Mock) people(distinctId string) *MockPeople {
-	p := m.People[distinctId]
-	if p == nil {
-		p = &MockPeople{
-			Properties: map[string]interface{}{},
-		}
-		m.People[distinctId] = p
-	}
+func (m *Mock) Reset() {
+	m.people = sync.Map{}
+}
 
-	return p
+// Identifies a user. The user will be added to the people map.
+func (m *Mock) getPeople(distinctId string) *MockPeople {
+	p, _ := m.people.LoadOrStore(distinctId, &MockPeople{
+		Properties: map[string]interface{}{},
+	})
+
+	return p.(*MockPeople)
 }
 
 func (m *Mock) Track(distinctId, eventName string, e *Event) error {
-	p := m.people(distinctId)
+	p := m.getPeople(distinctId)
 	p.Events = append(p.Events, MockEvent{
 		Event: *e,
 		Name:  eventName,
@@ -49,7 +51,7 @@ func (m *Mock) Track(distinctId, eventName string, e *Event) error {
 }
 
 func (m *Mock) Import(distinctId, eventName string, e *Event) error {
-	p := m.people(distinctId)
+	p := m.getPeople(distinctId)
 	p.Events = append(p.Events, MockEvent{
 		Event: *e,
 		Name:  eventName,
@@ -98,7 +100,7 @@ func (m *Mock) Update(distinctId string, u *Update) error {
 }
 
 func (m *Mock) UpdateUser(distinctId string, u *Update) error {
-	p := m.people(distinctId)
+	p := m.getPeople(distinctId)
 
 	if u.IP != "" {
 		p.IP = u.IP
