@@ -1,6 +1,7 @@
 package mixpanel
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -41,7 +42,7 @@ func (m *Mock) People(distinctId string) *MockPeople {
 	return p.(*MockPeople)
 }
 
-func (m *Mock) Track(distinctId, eventName string, e *Event) error {
+func (m *Mock) Track(_ context.Context, distinctId, eventName string, e *Event) error {
 	p := m.People(distinctId)
 	p.Events = append(p.Events, MockEvent{
 		Event: *e,
@@ -50,7 +51,7 @@ func (m *Mock) Track(distinctId, eventName string, e *Event) error {
 	return nil
 }
 
-func (m *Mock) Import(distinctId, eventName string, e *Event) error {
+func (m *Mock) Import(_ context.Context, distinctId, eventName string, e *Event) error {
 	p := m.People(distinctId)
 	p.Events = append(p.Events, MockEvent{
 		Event: *e,
@@ -95,11 +96,11 @@ func (mp *MockPeople) String() string {
 	return str
 }
 
-func (m *Mock) Update(distinctId string, u *Update) error {
-	return m.UpdateUser(distinctId, u)
+func (m *Mock) Update(ctx context.Context, distinctId string, u *Update) error {
+	return m.UpdateUser(ctx, distinctId, u)
 }
 
-func (m *Mock) UpdateUser(distinctId string, u *Update) error {
+func (m *Mock) UpdateUser(_ context.Context, distinctId string, u *Update) error {
 	p := m.People(distinctId)
 
 	if u.IP != "" {
@@ -121,19 +122,19 @@ func (m *Mock) UpdateUser(distinctId string, u *Update) error {
 	return nil
 }
 
-func (m *Mock) UnionUser(userID string, u *Update) error {
+func (m *Mock) UnionUser(_ context.Context, userID string, u *Update) error {
 	return nil
 }
 
-func (m *Mock) UpdateGroup(groupKey, groupUser string, u *Update) error {
+func (m *Mock) UpdateGroup(_ context.Context, groupKey, groupUser string, u *Update) error {
 	return nil
 }
 
-func (m *Mock) UnionGroup(groupKey, groupUser string, u *Update) error {
+func (m *Mock) UnionGroup(_ context.Context, groupKey, groupUser string, u *Update) error {
 	return nil
 }
 
-func (m *Mock) Alias(distinctId, newId string) error {
+func (m *Mock) Alias(_ context.Context, distinctId, newId string) error {
 	return nil
 }
 
