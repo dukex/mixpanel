@@ -65,6 +65,7 @@ type Mixpanel interface {
 	// Unions a group property in mixpanel
 	UnionGroup(groupId, groupKey string, u *Update) error
 
+	// Identifies a event with the associated user
 	Identify(identifiedID, anonId, eventName string, e *Event) error
 }
 
@@ -149,7 +150,9 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 	return m.send("track", params, autoGeolocate)
 }
 
-// Track create an event for an existing distinct id
+// Identify associates a event with a user that already exists
+// Supply empty anonId to create one
+// https://developer.mixpanel.com/reference/create-identity
 func (m *mixpanel) Identify(identifiedID, anonId, eventName string, e *Event) error {
 	props := map[string]interface{}{
 		"token":          m.Token,
@@ -163,8 +166,9 @@ func (m *mixpanel) Identify(identifiedID, anonId, eventName string, e *Event) er
 	if anonId == "" {
 		anonUUID := uuid.New()
 		anonId = anonUUID.String()
-		props["$anon_id"] = anonId
 	}
+
+	props["$anon_id"] = anonId
 
 	if e.IP != "" {
 		props["ip"] = e.IP
