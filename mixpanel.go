@@ -3,14 +3,19 @@ package mixpanel
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 var IgnoreTime *time.Time = &time.Time{}
+
+const identiftyURL = "track#create-identity"
 
 type MixpanelError struct {
 	URL string
@@ -59,6 +64,9 @@ type Mixpanel interface {
 
 	// Unions a group property in mixpanel
 	UnionGroup(groupId, groupKey string, u *Update) error
+
+	// Identifies a event with the associated user
+	Identify(identifiedID, anonId, eventName string, e *Event) error
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
@@ -121,6 +129,47 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 		"token":       m.Token,
 		"distinct_id": distinctId,
 	}
+	if e.IP != "" {
+		props["ip"] = e.IP
+	}
+	if e.Timestamp != nil {
+		props["time"] = e.Timestamp.Unix()
+	}
+
+	for key, value := range e.Properties {
+		props[key] = value
+	}
+
+	params := map[string]interface{}{
+		"event":      eventName,
+		"properties": props,
+	}
+
+	autoGeolocate := e.IP == ""
+
+	return m.send("track", params, autoGeolocate)
+}
+
+// Identify associates a event with a user that already exists
+// Supply empty anonId to create one
+// https://developer.mixpanel.com/reference/create-identity
+func (m *mixpanel) Identify(identifiedID, anonId, eventName string, e *Event) error {
+	props := map[string]interface{}{
+		"token":          m.Token,
+		"$identified_id": identifiedID,
+	}
+
+	if _, err := uuid.Parse(anonId); anonId != "" && err != nil {
+		return errors.New("invalid anonId")
+	}
+
+	if anonId == "" {
+		anonUUID := uuid.New()
+		anonId = anonUUID.String()
+	}
+
+	props["$anon_id"] = anonId
+
 	if e.IP != "" {
 		props["ip"] = e.IP
 	}
@@ -251,6 +300,9 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 
 	if err != nil {
 		return err
+	}
+	if eventType == "identify" {
+		eventType = identiftyURL
 	}
 
 	url := m.ApiURL + "/" + eventType + "?verbose=1"
