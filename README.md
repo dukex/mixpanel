@@ -1,5 +1,8 @@
 # Mixpanel Go Client
 
+## ⚠️ Use oficial mixpanel SDK: https://docs.mixpanel.com/docs/tracking-methods/sdks/go
+
+
 ## Usage
 
 ``` go
