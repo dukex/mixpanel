@@ -1,6 +1,7 @@
 package mixpanel
 
 import (
+	"context"
 	"fmt"
 	"time"
 )
@@ -12,7 +13,7 @@ func ExampleMock() {
 
 	t, _ := time.Parse(time.RFC3339, "2016-03-03T15:17:53+01:00")
 
-	client.Update("1", &Update{
+	client.Update(context.TODO(), "1", &Update{
 		Operation: "$set",
 		Timestamp: &t,
 		IP:        "127.0.0.1",
@@ -21,14 +22,14 @@ func ExampleMock() {
 		},
 	})
 
-	client.Track("1", "Sign Up", &Event{
+	client.Track(context.TODO(), "1", "Sign Up", &Event{
 		IP: "1.2.3.4",
 		Properties: map[string]interface{}{
 			"from": "email",
 		},
 	})
 
-	client.Import("1", "Sign Up", &Event{
+	client.Import(context.TODO(), "1", "Sign Up", &Event{
 		IP:        "1.2.3.4",
 		Timestamp: &t,
 		Properties: map[string]interface{}{

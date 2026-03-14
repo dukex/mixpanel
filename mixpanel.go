@@ -1,6 +1,7 @@
 package mixpanel
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -33,32 +34,32 @@ func (err *ErrTrackFailed) Error() string {
 	return fmt.Sprintf("mixpanel did not return 1 when tracking: %s", err.Message)
 }
 
-// The Mixapanel struct store the mixpanel endpoint and the project token
+// Mixapanel struct store the mixpanel endpoint and the project token
 type Mixpanel interface {
 	// Create a mixpanel event using the track api
-	Track(distinctId, eventName string, e *Event) error
+	Track(ctx context.Context, distinctId, eventName string, e *Event) error
 
 	// Create a mixpanel event using the import api
-	Import(distinctId, eventName string, e *Event) error
+	Import(ctx context.Context, distinctId, eventName string, e *Event) error
 
 	// Set properties for a mixpanel user.
 	// Deprecated: Use UpdateUser instead
-	Update(distinctId string, u *Update) error
+	Update(ctx context.Context, distinctId string, u *Update) error
 
 	// Set properties for a mixpanel user.
-	UpdateUser(distinctId string, u *Update) error
+	UpdateUser(ctx context.Context, distinctId string, u *Update) error
 
 	// Set properties for a mixpanel group.
-	UpdateGroup(groupKey, groupId string, u *Update) error
+	UpdateGroup(ctx context.Context, groupKey, groupId string, u *Update) error
 
 	// Create an alias for an existing distinct id
-	Alias(distinctId, newId string) error
+	Alias(ctx context.Context, distinctId, newId string) error
 
 	// Unions a profile property in mixpanel
-	UnionUser(distinctId string, u *Update) error
+	UnionUser(ctx context.Context, distinctId string, u *Update) error
 
 	// Unions a group property in mixpanel
-	UnionGroup(groupId, groupKey string, u *Update) error
+	UnionGroup(ctx context.Context, groupId, groupKey string, u *Update) error
 }
 
 // The Mixapanel struct store the mixpanel endpoint and the project token
@@ -100,7 +101,7 @@ type Update struct {
 }
 
 // Alias create an alias for an existing distinct id
-func (m *mixpanel) Alias(distinctId, newId string) error {
+func (m *mixpanel) Alias(ctx context.Context, distinctId, newId string) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
 		"distinct_id": distinctId,
@@ -112,11 +113,11 @@ func (m *mixpanel) Alias(distinctId, newId string) error {
 		"properties": props,
 	}
 
-	return m.send("track", params, false)
+	return m.send(ctx, "track", params, false)
 }
 
 // Track create an event for an existing distinct id
-func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
+func (m *mixpanel) Track(ctx context.Context, distinctId, eventName string, e *Event) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
 		"distinct_id": distinctId,
@@ -139,12 +140,12 @@ func (m *mixpanel) Track(distinctId, eventName string, e *Event) error {
 
 	autoGeolocate := e.IP == ""
 
-	return m.send("track", params, autoGeolocate)
+	return m.send(ctx, "track", params, autoGeolocate)
 }
 
 // Import create an event for an existing distinct id
 // See https://developer.mixpanel.com/docs/importing-old-events
-func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
+func (m *mixpanel) Import(ctx context.Context, distinctId, eventName string, e *Event) error {
 	props := map[string]interface{}{
 		"token":       m.Token,
 		"distinct_id": distinctId,
@@ -167,19 +168,19 @@ func (m *mixpanel) Import(distinctId, eventName string, e *Event) error {
 
 	autoGeolocate := e.IP == ""
 
-	return m.send("import", params, autoGeolocate)
+	return m.send(ctx, "import", params, autoGeolocate)
 }
 
 // Update updates a user in mixpanel. See
 // https://mixpanel.com/help/reference/http#people-analytics-updates
 // Deprecated: Use UpdateUser instead
-func (m *mixpanel) Update(distinctId string, u *Update) error {
-	return m.UpdateUser(distinctId, u)
+func (m *mixpanel) Update(ctx context.Context, distinctId string, u *Update) error {
+	return m.UpdateUser(ctx, distinctId, u)
 }
 
 // UpdateUser: Updates a user in mixpanel. See
 // https://mixpanel.com/help/reference/http#people-analytics-updates
-func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
+func (m *mixpanel) UpdateUser(ctx context.Context, distinctId string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":       m.Token,
 		"$distinct_id": distinctId,
@@ -198,12 +199,12 @@ func (m *mixpanel) UpdateUser(distinctId string, u *Update) error {
 
 	autoGeolocate := u.IP == ""
 
-	return m.send("engage#profile-set", params, autoGeolocate)
+	return m.send(ctx, "engage#profile-set", params, autoGeolocate)
 }
 
 // UpdateGroup: Updates a group in mixpanel. See
 // https://api.mixpanel.com/groups#group-set
-func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
+func (m *mixpanel) UpdateGroup(ctx context.Context, groupKey, groupId string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":     m.Token,
 		"$group_id":  groupId,
@@ -212,12 +213,12 @@ func (m *mixpanel) UpdateGroup(groupKey, groupId string, u *Update) error {
 
 	params[u.Operation] = u.Properties
 
-	return m.send("groups#group-set", params, false)
+	return m.send(ctx, "groups#group-set", params, false)
 }
 
 // UnionUser: Unions a profile property in mixpanel. See
 // https://api.mixpanel.com/engage#profile-union
-func (m *mixpanel) UnionUser(userID string, u *Update) error {
+func (m *mixpanel) UnionUser(ctx context.Context, userID string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":       m.Token,
 		"$distinct_id": userID,
@@ -225,12 +226,12 @@ func (m *mixpanel) UnionUser(userID string, u *Update) error {
 
 	params[u.Operation] = u.Properties
 
-	return m.send("engage#profile-union", params, false)
+	return m.send(ctx, "engage#profile-union", params, false)
 }
 
 // UnionGroup: Unions a group property in mixpanel. See
 // https://api.mixpanel.com/groups#group-union
-func (m *mixpanel) UnionGroup(groupId, groupKey string, u *Update) error {
+func (m *mixpanel) UnionGroup(ctx context.Context, groupId, groupKey string, u *Update) error {
 	params := map[string]interface{}{
 		"$token":     m.Token,
 		"$group_id":  groupId,
@@ -239,14 +240,14 @@ func (m *mixpanel) UnionGroup(groupId, groupKey string, u *Update) error {
 
 	params[u.Operation] = u.Properties
 
-	return m.send("groups#group-union", params, false)
+	return m.send(ctx, "groups#group-union", params, false)
 }
 
 func (m *mixpanel) to64(data []byte) string {
 	return base64.StdEncoding.EncodeToString(data)
 }
 
-func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool) error {
+func (m *mixpanel) send(ctx context.Context, eventType string, params interface{}, autoGeolocate bool) error {
 	data, err := json.Marshal(params)
 
 	if err != nil {
@@ -259,7 +260,7 @@ func (m *mixpanel) send(eventType string, params interface{}, autoGeolocate bool
 		return &MixpanelError{URL: url, Err: err}
 	}
 
-	request, err := http.NewRequest("POST", url, strings.NewReader("data="+m.to64(data)))
+	request, err := http.NewRequestWithContext(ctx, "POST", url, strings.NewReader("data="+m.to64(data)))
 	if err != nil {
 		return wrapErr(err)
 	}

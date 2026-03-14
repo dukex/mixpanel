@@ -1,6 +1,7 @@
 package mixpanel
 
 import (
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
@@ -58,7 +59,7 @@ func TestTrack(t *testing.T) {
 	setup()
 	defer teardown()
 
-	client.Track("13793", "Signed Up", &Event{
+	client.Track(context.TODO(), "13793", "Signed Up", &Event{
 		Properties: map[string]interface{}{
 			"Referred By": "Friend",
 		},
@@ -76,7 +77,7 @@ func TestImport(t *testing.T) {
 
 	importTime := time.Now().Add(-5 * 24 * time.Hour)
 
-	client.Import("13793", "Signed Up", &Event{
+	client.Import(context.TODO(), "13793", "Signed Up", &Event{
 		Properties: map[string]interface{}{
 			"Referred By": "Friend",
 		},
@@ -93,7 +94,7 @@ func TestGroupOperations(t *testing.T) {
 	setup()
 	defer teardown()
 
-	client.UpdateGroup("company_id", "11", &Update{
+	client.UpdateGroup(context.TODO(), "company_id", "11", &Update{
 		Operation: "$set",
 		Properties: map[string]interface{}{
 			"Address":  "1313 Mockingbird Lane",
@@ -111,7 +112,7 @@ func TestUpdateUser(t *testing.T) {
 	setup()
 	defer teardown()
 
-	client.UpdateUser("13793", &Update{
+	client.UpdateUser(context.TODO(), "13793", &Update{
 		Operation: "$set",
 		Properties: map[string]interface{}{
 			"Address":  "1313 Mockingbird Lane",
@@ -152,7 +153,7 @@ func TestError(t *testing.T) {
 
 	client = New("e3bc4100330c35722740fb8c6f5abddc", ts.URL)
 
-	assertErrTrackFailed(client.UpdateUser("1", &Update{}))
-	assertErrTrackFailed(client.Track("1", "name", &Event{}))
-	assertErrTrackFailed(client.Import("1", "name", &Event{}))
+	assertErrTrackFailed(client.UpdateUser(context.TODO(), "1", &Update{}))
+	assertErrTrackFailed(client.Track(context.TODO(), "1", "name", &Event{}))
+	assertErrTrackFailed(client.Import(context.TODO(), "1", "name", &Event{}))
 }
